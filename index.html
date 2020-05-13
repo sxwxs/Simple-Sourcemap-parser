@@ -1,0 +1,91 @@
+<head>
+<meta charset='utf8'>
+<title>Parse Sourcemap</title>
+</head>
+
+<h3>Load sourcemap from file</h3>
+<label>Sourcemap File</label><input type='file' id='source_map_url' onchange='get_map(this)'><br>
+
+<hr>
+
+<h3>Locate source code</h3>
+<label>Line </label><input type='text' id='linen'><br>
+<label>Column</label><input type='text' id='coln'><br>
+<button onclick='get_src()'>Locate in Source Code</button>
+<div id = 'info'></div>
+<pre class="line-numbers"><code id='code'  class="language-js"></code></pre>
+<h4>Click to view source code</h4>
+
+<ul id='source_list'></ul>
+
+
+
+<script src="https://unpkg.com/source-map@0.7.3/dist/source-map.js"></script>
+<script>
+    sourceMap.SourceMapConsumer.initialize({
+        "lib/mappings.wasm": "https://unpkg.com/source-map@0.7.3/lib/mappings.wasm"
+    });
+</script>
+
+<script>
+    let rawmap;
+    let mc;
+    function show_code(e) {
+        for (let i = 0; i < mc.sources.length; i++) {
+            if (mc.sources[i] == e.innerText) {
+                code.innerText = mc.sourcesContent[i];
+                break;
+            }
+        }
+    }
+    
+    function get_map(e) {
+        let source_map_file = e.files[0];
+        let reader = new FileReader();
+        reader.readAsText(source_map_file);
+        reader.onload = () => {
+            rawmap = JSON.parse(reader.result);
+            const whatever = sourceMap.SourceMapConsumer.with(rawmap, null, consumer => {
+                mc = consumer;
+                let html = '';
+                for (let i = 0; i < consumer.sources.length; i++) {
+                    html += '<li onclick="show_code(this)"><a href="javascript:void(0)">' + consumer.sources[i] + '</a></li>';
+                }
+                source_list.innerHTML = html;
+            });
+        };
+    }
+    
+    function get_src() {
+        let line = parseInt(linen.value);
+        let col = parseInt(coln.value);
+        let target = mc.originalPositionFor({
+          line: line,
+          column: col
+        });
+        if (target.source == null) {
+            target = mc.originalPositionFor({
+              line: line,
+              column: col-1
+            });
+            console.log(col-1);
+        }
+        info.innerHTML = '<p>' + JSON.stringify(target) +'</p>' + '<p><a href="#line_'+target.line+'">go to line '+target.line+'</a></p>';
+        for (let i = 0; i < mc.sources.length; i++) {
+            if (mc.sources[i] == target.source) {
+                let innerHTML = '';
+                let codeline = mc.sourcesContent[i].split('\n');
+                for (let j = 0; j < codeline.length; j++) {
+                    if (j + 1 == target.line) {
+                        innerHTML += '<code style="color:red;" id="line_'+(j+1)+'">' + (j+1) + '  ' + codeline[j] + '\n</code>';
+                    }
+                    else {
+                        innerHTML += '<code id="line_'+(j+1)+'">' + (j+1) + '  ' + codeline[j] + '\n</code>';
+                    }
+                }
+                code.innerHTML = innerHTML;
+                break;
+            }
+        }
+    }
+</script>
